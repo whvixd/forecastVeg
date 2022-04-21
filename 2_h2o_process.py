@@ -7,6 +7,9 @@ print "Arguments passed to script:", my_args
 load_data_fp = my_args[0]
 save_data_fp = my_args[1]
 
+# 将CSV文件导入h2o中，并且处理异常的列
+# python -u 2_h2o_process.py /data/john/CA/data1.csv /data/john/CA/h2o_data_withMissing > 2a_h2oCA.log &
+
 #######################################################################
 print "Initializing h2o..."
 import h2o

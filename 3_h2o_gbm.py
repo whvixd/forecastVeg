@@ -11,6 +11,9 @@ load_train_ind_fp = my_args[1]
 saving_fp = my_args[2]
 predictors = my_args[3:]
 
+# python -u 3\_h2o\_gbm.py load_data_fp load_train_ind_fp
+# saving_fp GWP\_lag LST\_lag NDVI\_lag FPAR\_lag LAI\_lag GP\_lag PSN\_lag nino34\_lag time\_period EVI\_lag landuse \> 3\_gbm.log &
+
 # GWP_lag LST_lag NDVI_lag FPAR_lag LAI_lag GP_lag PSN_lag nino34_lag time_period EVI_lag
 # if SPECTRAL B1_lag B2_lag B3_lag B4_lag B5_lag B6_lag B7_lag GWP_lag nino34_lag time_period EVI_lag
 

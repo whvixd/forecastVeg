@@ -2,6 +2,23 @@ from __future__ import division
 import csv, time, sys, pickle, h2o
 from hyperopt import fmin, tpe, hp, STATUS_OK, STATUS_FAIL, Trials
 
+# python -u 3_h2o_deeplearning.py
+# /data/john/CA/mean_imputed_data
+# /data/john/CA/random_split_for_training.csv
+# output/dlres_meanimputedCA.csv
+#### 线性回归入参:
+# GWP_lag
+# LST_lag
+# NDVI_lag
+# FPAR_lag
+# LAI_lag
+# GP_lag
+# PSN_lag
+# nino34_lag
+# time_period
+# EVI_lag
+# landuse > 3_dl_meanCA.log &
+
 my_args = sys.argv
 print "Running script:", sys.argv[0]
 my_args = sys.argv[1:]
@@ -42,105 +59,124 @@ print "Training data has",train.ncol(),"columns and",train.nrow(),"rows, test ha
 
 print "Making data 25% smaller so this doesnt take as long by randomly keeping 75% of the rows."
 r = train[0].runif() # Random UNIform numbers (0,1), one per row
-train = train[ r < 0.75 ] 
+train = train[ r < 0.75 ]
 print "Training data now has",train.nrow(),"rows."
 
 h2o.remove([test_index, train_index, d])
 del test_index, train_index, d
 
 def split_fit_predict_dl(h1, h2, h3, hdr1, hdr2, hdr3, rho, epsilon):
-  print "Trying h1, h2, h3, hdr1, hdr2, hdr3, rho, epsilon values of:", h1, h2, h3, hdr1, hdr2, hdr3, rho, epsilon
-  dl = h2o.deeplearning(x = train[predictors],
-                y = train['EVI'],
-                validation_x = test[predictors],
-                validation_y = test['EVI'],
-                training_frame = train,
-                validation_frame = test,
-                weights_column = 'PixelReliability',
-                hidden = [int(h1), int(h2), int(h3)],
-                activation = "RectifierWithDropout",
-                hidden_dropout_ratios = [hdr1, hdr2, hdr3],
-                fast_mode = True,
-                rho = rho, epsilon = epsilon)
-  mse = dl.mse(valid=True)
-  r2 = dl.r2(valid=True)
-  print "Deep learning MSE:", mse
-  return([mse, r2])
+    print "Trying h1, h2, h3, hdr1, hdr2, hdr3, rho, epsilon values of:", h1, h2, h3, hdr1, hdr2, hdr3, rho, epsilon
+    # H2O是一个基于java的机器学习/深度学习平台，它支持大量无监督和有监督的模型，也支持深度学习算法；可以作为R或Python包导入，也给用户提供UI似的界面
+    # from h2o.estimators.deeplearning import H2ODeepLearningEstimator
+    dl = h2o.deeplearning(
+        # 特征
+        x=train[predictors],
+        # 标签
+        y=train['EVI'],
+        validation_x=test[predictors],
+        validation_y=test['EVI'],
+        training_frame=train,
+        validation_frame=test,
+        # 权重
+        weights_column='PixelReliability',
+        # 隐藏层
+        hidden=[int(h1), int(h2), int(h3)],
+        # 激活函数
+        activation="RectifierWithDropout",
+        # 隐藏层丢弃率
+        hidden_dropout_ratios=[hdr1, hdr2, hdr3],
+        fast_mode=True,
+        rho=rho, epsilon=epsilon)
+    # dl.train()
+    # 损失函数：均方差
+    mse = dl.mse(valid=True)
+    r2 = dl.r2(valid=True)
+    print "Deep learning MSE:", mse
+    return ([mse, r2])
 
-def start_save(csvfile, initialize = ['mse', 'r2', 'h1', 'h2', 'h3', 'hdr1', 'hdr2', 'hdr3', 'rho', 'epsilon', 'timing', 'datetime']):
-  with open(csvfile, "w") as output:
-    writer = csv.writer(output, lineterminator='\n')
-    writer.writerow(initialize)
+
+def start_save(csvfile, initialize=['mse', 'r2', 'h1', 'h2', 'h3', 'hdr1', 'hdr2', 'hdr3', 'rho', 'epsilon', 'timing',
+                                    'datetime']):
+    with open(csvfile, "w") as output:
+        writer = csv.writer(output, lineterminator='\n')
+        writer.writerow(initialize)
+
 
 def objective(args):
-  h1, h2, h3, hdr1, hdr2, hdr3, rho, epsilon = args
-  time1 = time.time()
-  try:
-    mse, r2 = split_fit_predict_dl(h1, h2, h3, hdr1, hdr2, hdr3, rho, epsilon)
-  except:
-    print "Error in trying to fit and then predict with dl model:", sys.exc_info()[0]
-    mse = None
-    r2 = None
-    status = STATUS_FAIL
-  else:
-    status = STATUS_OK
-  
-  timing = time.time() - time1
-  datetime = time.strftime("%c")
-  tosave = [mse, r2, int(h1), int(h2), int(h3), hdr1, hdr2, hdr3, rho, epsilon, timing, datetime]
-  with open(saving_fp, "a") as output:
-    writer = csv.writer(output, lineterminator='\n')
-    writer.writerow(tosave)
-  return {'loss': mse,
-        'status': status,
-        # other non-essential results:
-        'eval_time': timing}
+    h1, h2, h3, hdr1, hdr2, hdr3, rho, epsilon = args
+    time1 = time.time()
+    try:
+        mse, r2 = split_fit_predict_dl(h1, h2, h3, hdr1, hdr2, hdr3, rho, epsilon)
+    except:
+        print "Error in trying to fit and then predict with dl model:", sys.exc_info()[0]
+        mse = None
+        r2 = None
+        status = STATUS_FAIL
+    else:
+        status = STATUS_OK
 
-def run_all_dl(csvfile = saving_fp, 
-                space = [hp.quniform('h1', 100, 550, 1), 
-                        hp.quniform('h2', 100, 550, 1),
-                        hp.quniform('h3', 100, 550, 1),
-                        #hp.choice('activation', ["RectifierWithDropout", "TanhWithDropout"]),
-                        hp.uniform('hdr1', 0.001, 0.3),
-                        hp.uniform('hdr2', 0.001, 0.3),
-                        hp.uniform('hdr3', 0.001, 0.3),
-                        hp.uniform('rho', 0.9, 0.999), 
-                        hp.uniform('epsilon', 1e-10, 1e-4)]):
-          # maxout works well with dropout (Goodfellow et al 2013), and rectifier has worked well with image recognition (LeCun et al 1998)
-          start_save(csvfile = csvfile)
-          trials = Trials()
-          print "Deep learning..."
-          best = fmin(objective,
-                      space = space,
-                      algo=tpe.suggest,
-                      max_evals=evals,
-                      trials=trials)
-          print best
-          print trials.losses()
-          with open('output/dlbest.pkl', 'w') as output:
-            pickle.dump(best, output, -1)
-          with open('output/dltrials.pkl', 'w') as output:
-            pickle.dump(trials, output, -1)
+    timing = time.time() - time1
+    datetime = time.strftime("%c")
+    tosave = [mse, r2, int(h1), int(h2), int(h3), hdr1, hdr2, hdr3, rho, epsilon, timing, datetime]
+    with open(saving_fp, "a") as output:
+        writer = csv.writer(output, lineterminator='\n')
+        writer.writerow(tosave)
+    return {'loss': mse,
+            'status': status,
+            # other non-essential results:
+            'eval_time': timing}
+
+
+def run_all_dl(csvfile=saving_fp,
+               space=[hp.quniform('h1', 100, 550, 1),  # quniform：离散均匀分布；uniform：连续均匀分布
+                      hp.quniform('h2', 100, 550, 1),
+                      hp.quniform('h3', 100, 550, 1),
+                      # hp.choice('activation', ["RectifierWithDropout", "TanhWithDropout"]),
+                      hp.uniform('hdr1', 0.001, 0.3),
+                      hp.uniform('hdr2', 0.001, 0.3),
+                      hp.uniform('hdr3', 0.001, 0.3),
+                      hp.uniform('rho', 0.9, 0.999),
+                      # 偏差
+                      hp.uniform('epsilon', 1e-10, 1e-4)]):
+    # maxout works well with dropout (Goodfellow et al 2013), and rectifier has worked well with image recognition (LeCun et al 1998)
+    start_save(csvfile=csvfile)
+    # 每次结果放到这里
+    trials = Trials()
+    print "Deep learning..."
+    # 在 objective 函数中寻求最小解（MSE），evals：执行次数
+    best = fmin(objective,  # 函数
+                space=space,
+                algo=tpe.suggest,
+                max_evals=evals,
+                trials=trials)
+    print best
+    print trials.losses()
+    with open('output/dlbest.pkl', 'w') as output:
+        pickle.dump(best, output, -1)
+    with open('output/dltrials.pkl', 'w') as output:
+        pickle.dump(trials, output, -1)
+
 
 run_all_dl()
 
 # Send email
 email = False
-if(email):
-  import smtplib
-  GMAIL_USERNAME = None
-  GMAIL_PW = None
-  RECIP = None
-  SMTP_NUM = None
-  session = smtplib.SMTP('smtp.gmail.com', SMTP_NUM)
-  session.ehlo()
-  session.starttls()
-  session.login(GMAIL_USERNAME, GMAIL_PW)
-  headers = "\r\n".join(["from: " + GMAIL_USERNAME,
-                         "subject: " + "Finished running script: " + __file__,
-                         "to: " + RECIP,
-                         "mime-version: 1.0",
-                         "content-type: text/html"])
-  content = headers + "\r\n\r\n" + "Done running the script.\n Sent from my Python code."
-  session.sendmail(GMAIL_USERNAME, RECIP, content)
+if (email):
+    import smtplib
 
+    GMAIL_USERNAME = None
+    GMAIL_PW = None
+    RECIP = None
+    SMTP_NUM = None
+    session = smtplib.SMTP('smtp.gmail.com', SMTP_NUM)
+    session.ehlo()
+    session.starttls()
+    session.login(GMAIL_USERNAME, GMAIL_PW)
+    headers = "\r\n".join(["from: " + GMAIL_USERNAME,
+                           "subject: " + "Finished running script: " + __file__,
+                           "to: " + RECIP,
+                           "mime-version: 1.0",
+                           "content-type: text/html"])
+    content = headers + "\r\n\r\n" + "Done running the script.\n Sent from my Python code."
+    session.sendmail(GMAIL_USERNAME, RECIP, content)

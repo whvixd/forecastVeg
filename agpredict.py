@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# coding=utf-8
 
 # -*- coding: utf-8 -*-
 """
@@ -86,6 +87,9 @@ class Image(object):
 		:param scale:  to scale factor for each dataset in HDF to transform raw data 
 			into final data values.  Taken from the NASA website.  User does not 
 			need to enter.
+
+		为每个数据集在HDF中的比例因子转换原始数据
+        转换成最终的数据值。摘自NASA网站。用户不需要输入
 		
 		:param varNames: variable names of each dataset in the HDF.  User does not 
 			need to enter.
@@ -149,14 +153,16 @@ class Image(object):
         self.scale = scale
         self.varNames = varNames
         self.qualityBand = qualityBand
-                           
+
+    #  下载数据，HDF格式
     def download(self):
         
         """
 		Download images for specified tiles and time period.
 		
 		:param filelist: lists all of the HDF files downloaded
-		
+
+		 1年的数据= 23次观测
 		:param observations:  lists the total number of days worth of data downloaded
 			(e.g. 1 year of data = 23 observations).
 			(e.g. 1 year of data = 23 observations).
@@ -179,19 +185,24 @@ class Image(object):
                      
         dm.downloadsAllDay()
         logger.log('SUCCESS', 'Downloading is complete!  %d HDF files of %s data for tiles %s were downloaded for the following days:  %s' % (self.observations*len(self.tiles), str(self.dataset), str(self.tiles), str(self.filelist)))
-        
+
+    # 如果用户输入的图像块超过两个，此函数将对图像块进行拼接在一起。多个tile(地区)
+    # 输出成 tif文件
     def mosaic(self):
         
         """
 		If more than two tiles are input by the user, this function mosaics the tiles
 		together.		
 		"""
-        
+        # 多个地区
         if len(self.tiles) > 1:
             hdflist = sorted(glob.glob(self.fullPath + '/*.hdf'))
             for i in range(0,len(hdflist),2):
+                # 一个使用GDAL将modis数据从hdf格式拼接到GDAL格式的类
                 ms = pymodis.convertmodis_gdal.createMosaicGDAL(hdfnames = [hdflist[i], hdflist[i+1]], subset = self.subset, outformat = 'GTiff')
+                # MOD11A1.A2014226.mos.tif
                 ms.run(str(hdflist[i].split('.h')[0]) + 'mos.tif')
+                # MOD11A1.A2014226.vrt
                 ms.write_vrt(output = str(hdflist[i].split('.h')[0]), separate = True)
             mosaicCount = len(glob.glob(self.fullPath + '/*mos.tif'))
             logger.log('SUCCESS', 'Mosaic complete!  MODIS tiles %s were successfully mosaicked into %d mosaic images.' % (str(self.tiles), mosaicCount)) 
@@ -204,6 +215,7 @@ class Image(object):
         If no vrt files were produced in the previous step, it converts the original hdf files.  
 		
 		"""
+        # 这个函数将HDF文件转换为referenceImage的文件扩展名。它使用拼接步骤中生成的vrt文件将图像投射到referenceImage的投影中。如果在上一步中没有生成vrt文件，它将转换原始的hdf文件。
         
         vrtlist = sorted(glob.glob(self.fullPath + '/*vrt'))
         splitAt = len(self.fullPath) + 1
@@ -267,9 +279,11 @@ class Image(object):
         """
 		This function clips the mosaicked, projected images to the size of the
 		referenceImage
-		
+
+		这个函数将拼接的投影图像剪辑到referenceImage的大小
 		"""
-                
+        # 此程序生成一个shapefile，其中包含每个输入栅格文件的记录、
+        # 包含文件名的属性以及概述栅格的多边形几何图形。此输出适用于 MapServer 作为栅格tileindex。
         subprocess.call(['gdaltindex', self.extent, self.referenceImagePath])
         dataNames = sorted(glob.glob(self.fullPath + '/full*.tif'))
         splitAt = len(self.fullPath) + 1
@@ -277,6 +291,7 @@ class Image(object):
         for i in range(len(dataNames)):
             x = dataNames[i]
             y = dataNames[i][:splitAt] + dataNames[i][splitAt+4:]
+            # 这个 gdalwarp 实用程序是一种图像拼接、重投影和扭曲实用程序。该程序可以重新投影到任何支持的投影，也可以应用与图像一起存储的gcp，如果图像是带有控制信息的“原始”图像。
             subprocess.call(['gdalwarp', '-r', 'near', '-cutline', self.extent, '-crop_to_cutline', x, y, '-dstnodata', '9999'])
           
         for n in dataNames:
@@ -292,28 +307,40 @@ class Image(object):
 		pixels by observations.  If the image has 100 pixels for 1 year (23 observations)
 		then this matrix should have dimensions 100 rows by 23 columns.  The matrix
 		includes the quality mask dataset.  This matrix is not yet masked for quality control.
+
+		这个函数将图像转换为一个单一的数字数组，尺寸像素通过观察。
+		如果图像有100像素为1年(23个观察)，那么这个矩阵应该有尺寸100行23列。
+		该矩阵包括质量掩码数据集。为了进行质量控制，这个矩阵还没有被掩盖。
 		"""
-        
+
+        # 变量数
         dataCount = self.subset.count('1')
+        # 获取所有的变量栏格
         dataNames = sorted(glob.glob(self.fullPath + '/*.tif'))
         dataNames = dataNames[0:dataCount]
         subsetInt = [int(s) for s in self.subset.split() if s.isdigit()] 
-                
+
+        # observations 为天数
         DC = np.empty(shape = (self.rows*self.columns*self.observations,0))  
         DCs = np.empty(shape = (self.rows*self.columns*self.observations, subsetInt.count(1)))  
         
         for i in range(dataCount):
             name = str(dataNames[i])
             dataList = sorted(glob.glob(self.fullPath + '/*' + name[-10:-4] + '.tif'))  
-            bandDC = np.empty((0, 1))      
+            bandDC = np.empty((0, 1))
+            # 一类变量
             for b in dataList:
+                # 原来为4X4
                 data = gdal.Open(str(b), GA_ReadOnly).ReadAsArray()
+                # 转成 16X1
                 vec = data.reshape((self.rows*self.columns, 1))
+                # 添加到bandDC数组中
                 bandDC = np.append(bandDC, vec, axis = 0)  
             DC = np.append(DC, bandDC, axis = 1) 
             del vec, bandDC, data
         
-        #apply fill values    
+        #apply fill values
+        # 异常数据
         if self.dataset == 'MOD15A2.005' or self.dataset == 'MOD17A2.005':
             DC[DC>self.fillValue] = 9999.0                
         if self.dataset == 'MOD11A2.005':
@@ -322,7 +349,7 @@ class Image(object):
             DC[DC == self.fillValue] = 9999.0 
         
         
-        #scale dataset
+        #scale dataset 规模数据集 -》 原始大小
         count = 0    
         for i in range(len(subsetInt)):
             if subsetInt[i] == 1:
@@ -331,8 +358,9 @@ class Image(object):
         DCs[DC == 9999.0] = 9999.0
         self.DC = DCs
         del DC
-        
-        #metadata function        
+
+
+        #metadata function        写到本地txt中，metadata_MOD11A1.txt
         with open(self.fullPath + '/' + 'metadata_' + self.dataset + '.txt', 'w') as f:
             f.write(' '.join(["self.%s = %s" % (k,v) for k,v in self.__dict__.iteritems()]))
         
@@ -346,7 +374,8 @@ class Image(object):
                
         """
         This function applies the MODIS quality mask to the dataset.  
-        Masked pixels are given a value of 9999.0.  
+        Masked pixels are given a value of 9999.0.
+        该函数将MODIS质量掩码应用于数据集。蒙面像素的值为9999.0。
         """       
 
         subsetInt = [int(s) for s in self.subset.split() if s.isdigit()]
@@ -467,9 +496,12 @@ class Image(object):
     
     def prepare(self):
         self.download()
+        # hdf -> tif
         self.mosaic()
+        # -> vrt
         self.convert()
         self.clip()
+
         self.matrix() 
         self.quality()
         self.qualityCheck()
@@ -708,6 +740,7 @@ class MOD13Q1(Image):
     def finalMatrix(self):
 
         #create latitude/longitude grid
+        global obs
         xoff, a, b, yoff, d, e = self.referenceImage.GetGeoTransform()
 
         def pixel2coord(x,y):
@@ -718,7 +751,8 @@ class MOD13Q1(Image):
         arr = self.referenceImage.ReadAsArray()
         lat = np.empty(shape = (arr.shape[0], arr.shape[1]))
         lon = np.empty(shape = (arr.shape[0], arr.shape[1]))
-        
+
+        # 遍历矩阵（二位数组）
         for row in range(arr.shape[0]):
             for col in range(arr.shape[1]):
                 coor = pixel2coord(row,col)
@@ -770,6 +804,14 @@ class MOD13Q1(Image):
         grid = np.repeat(grid, lag, axis = 1)
 
         grid_sized = grid[0:self.rows, 0:self.columns].reshape((1, self.rows, self.columns))
+
+        # whvixd 补充
+        if len(self.tiles) > 1:
+            obs = self.observations / len(self.tiles)
+        if len(self.tiles) == 1:
+            obs = self.observations / 2
+        #     ===
+
         grid_rep = np.repeat(grid_sized, obs, axis  = 0)
         grid_final = grid_rep.reshape((obs*self.rows*self.columns, 1))
         
@@ -841,6 +883,7 @@ class MOD11A2(Image):
         self.outformat = self.referenceImage.GetDriver().ShortName
         
         self.scale = [.02, 1 ,.1, 1, .02, 1, .1, 1, .002, .002, 1, 1]  #plus -65 and .49 on LPDAAC?
+        # https://lpdaac.usgs.gov/products/mod11a2v061/
         self.varNames = ['LST', 'Quality', 'Day View Time', 'Day View Angle', 'LST NIght', 'QC Night', 'Night View Time', 'Night View Angle', 'Band 31', 'Band 32', 'Clear Sky Days', 'Clear Sky Nights']
         self.qualityBand = 1 
         self.fillValue = 0 

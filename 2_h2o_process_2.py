@@ -3,6 +3,8 @@ import sys, time, csv, h2o
 import numpy as np
 import pandas as pd
 
+# python -u 2_h2o_process_2.py /data/john/srilanka/h2o_data_withMissing /data/john/srilanka/h2o_data_training
+# /data/john/srilanka/h2o_data_holdout /data/john/srilanka/random_split_for_training.csv > 2b_h2o.log &
 # Fetch command line arguments
 my_args = sys.argv
 print "Running script:", sys.argv[0]

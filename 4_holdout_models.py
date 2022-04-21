@@ -3,6 +3,14 @@ import pandas as pd
 import numpy as np
 import csv, time, sys, pickle, h2o
 
+# python -u 4_holdout_models.py
+# /data/john/CA/h2o_data_holdout
+# /data/john/CA/h2o_data_training
+# output/gbmresCA.csv
+# output/gbm_holdout_finalCA.csv
+# /data/john/CA/gbm_predicted_holdout.csv
+# output/gbm_varimpCA.csv
+# GWP_lag LST_lag NDVI_lag FPAR_lag LAI_lag GP_lag PSN_lag nino34_lag time_period EVI_lag landuse > 4_model_holdoutCA.log &
 my_args = sys.argv
 print "Running script:", sys.argv[0]
 my_args = sys.argv[1:]
@@ -66,6 +74,7 @@ assert d['landuse'].isfactor()
 print d['landuse'].unique()
 d.describe()
 
+####### 预测模型，params：训练时最优参数，GBM模型，DL模型如上
 def fit_predict_gbm(params, predictors, csvfile, saving_varimp_fp):
   ntrees, max_depth, learn_rate = params
   time1 = time.time()

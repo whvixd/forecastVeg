@@ -1,7 +1,10 @@
 from __future__ import division
 import numpy as np
 import sys
+# python -u 1_pre_process.py /data/emily/CA/ /data/john/CA/data1.csv
+# /data/emily/SJ/SJlanduse.npy 253 > 1_processCA.log &
 
+# 将图片的矩阵添加列和唯一id，转成pandas
 my_args = sys.argv
 print "Running script:", sys.argv[0]
 my_args = sys.argv[1:]
