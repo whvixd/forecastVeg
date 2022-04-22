@@ -1,6 +1,8 @@
 from __future__ import division
 import csv, time, sys, pickle, h2o
+# Hyperopt：是进行超参数优化的一个类库。有了它我们就可以拜托手动调参的烦恼，并且往往能够在相对较短的时间内获取原优于手动调参的最终结果。
 from hyperopt import fmin, tpe, hp, STATUS_OK, STATUS_FAIL, Trials
+# from hyperopt import hp
 
 # python -u 3_h2o_deeplearning.py
 # /data/john/CA/mean_imputed_data
@@ -128,6 +130,8 @@ def objective(args):
             'eval_time': timing}
 
 
+# hp.uniform(label,low,high)参数在low和high之间均匀分布。
+# hp.quniform(label,low,high,q),参数的取值round(uniform(low,high)/q)*q，适用于那些离散的取值。
 def run_all_dl(csvfile=saving_fp,
                space=[hp.quniform('h1', 100, 550, 1),  # quniform：离散均匀分布；uniform：连续均匀分布
                       hp.quniform('h2', 100, 550, 1),
@@ -145,7 +149,7 @@ def run_all_dl(csvfile=saving_fp,
     trials = Trials()
     print "Deep learning..."
     # 在 objective 函数中寻求最小解（MSE），evals：执行次数
-    best = fmin(objective,  # 函数
+    best = fmin(objective,  # DNN函数
                 space=space,
                 algo=tpe.suggest,
                 max_evals=evals,

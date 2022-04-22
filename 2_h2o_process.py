@@ -33,6 +33,7 @@ data['landuse'] = data['landuse'].asfactor()
 print data['landuse'].unique()
 
 #######################################################################
+# 由于没有滞后的预测因素，它们在所有时间段都在下降
 print "Dropping all time period 1 because they have no lagged predictors..."
 ind = data["timeID"] != 1
 data = data[ind] # Gett ERRORS here that the Java heap does not have enough memory, unless you 

@@ -64,7 +64,6 @@ if spectral == '1':
                            tiles=tiles, today=today, enddate=enddate, referenceImage=referenceImage)
         mod13.prepare()
 
-    # 矩阵化，图片->矩阵
     mod09.finalMatrix()
 
 # python -u 0_matrix_construction.py 1 /data/emily/SL myusername mypassword 'h25v08 h26v08' 2014-01-30 2014-01-01 /data/emily/WF/NDVI_DC/SL.tif

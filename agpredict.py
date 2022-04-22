@@ -328,7 +328,7 @@ class Image(object):
             name = str(dataNames[i])
             dataList = sorted(glob.glob(self.fullPath + '/*' + name[-10:-4] + '.tif'))  
             bandDC = np.empty((0, 1))
-            # 一类变量
+            # 一类变量，像素都放在一列中
             for b in dataList:
                 # 原来为4X4
                 data = gdal.Open(str(b), GA_ReadOnly).ReadAsArray()
@@ -502,7 +502,9 @@ class Image(object):
         self.convert()
         self.clip()
 
-        self.matrix() 
+        # tif -> matrix
+        self.matrix()
+        # 将质量好的数据应用的矩阵中
         self.quality()
         self.qualityCheck()
     
@@ -522,11 +524,14 @@ class Image(object):
             return(xp,yp)
 
         arr = self.referenceImage.ReadAsArray()
+        # 维度
         lat = np.empty(shape = (arr.shape[0], arr.shape[1]))
+        # 经度
         lon = np.empty(shape = (arr.shape[0], arr.shape[1]))        
 
         for row in range(arr.shape[0]):
             for col in range(arr.shape[1]):
+                # 像素转坐标
                 coor = pixel2coord(row,col)
                 lat[row,col] = coor[0]
                 lon[row,col] = coor[1]        
@@ -755,6 +760,7 @@ class MOD13Q1(Image):
         # 遍历矩阵（二位数组）
         for row in range(arr.shape[0]):
             for col in range(arr.shape[1]):
+                # 坐标
                 coor = pixel2coord(row,col)
                 lat[row,col] = coor[0]
                 lon[row,col] = coor[1]
