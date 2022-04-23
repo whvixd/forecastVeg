@@ -104,6 +104,7 @@ if 'landuse' in coln:
 print "Turn into pandas DataFrame for lagging and saving."
 import pandas as pd
 assert len(coln)==dat.shape[1]
+# 转成两维数组
 df = pd.DataFrame(dat, columns = coln) # dat is a numpy 2d array
 print "Created the pandas DataFrame."
 

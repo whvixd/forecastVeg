@@ -3,6 +3,10 @@ import pandas as pd
 import numpy as np
 import csv, time, sys, pickle, h2o
 
+'''
+第四步：预测，利用第三步算出的最优超参数，进行预测
+'''
+
 # python -u 4_holdout_models.py
 # /data/john/CA/h2o_data_holdout
 # /data/john/CA/h2o_data_training
@@ -100,14 +104,16 @@ def fit_predict_gbm(params, predictors, csvfile, saving_varimp_fp):
   with open(csvfile, "a") as output:
     writer = csv.writer(output, lineterminator='\n')
     writer.writerow(tosave)
-  
+
+  # 预测的值
   # lists are too large so have to do this in two pieces
   yh2o = model.predict(holdout[predictors])
   y1 = h2o.as_list(yh2o[0:yh2o.dim[0]/2,:,], use_pandas=False)
   y2 = h2o.as_list(yh2o[len(y1):yh2o.dim[0]+1,:,], use_pandas=False)
   y_l = y1 + y2
   y = np.squeeze(y_l)
-  
+
+  # 获取真正的值
   evi = holdout["EVI"]
   yreal1 = h2o.as_list(evi[0:evi.dim[0]/2,:,], use_pandas=False)
   yreal2 = h2o.as_list(evi[len(yreal1):evi.dim[0]+1,:,], use_pandas=False)

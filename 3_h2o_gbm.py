@@ -109,7 +109,9 @@ def objective(args):
           'eval_time': timing}
 
 def run_all_gbm(csvfile = saving_fp, 
-                space = [hp.quniform('ntrees', 200, 750, 1), hp.quniform('max_depth', 5, 15, 1), hp.uniform('learn_rate', 0.03, 0.35)]):
+                space = [hp.quniform('ntrees', 200, 750, 1),
+                         hp.quniform('max_depth', 5, 15, 1),
+                         hp.uniform('learn_rate', 0.03, 0.35)]):
   # Search space is a stochastic argument-sampling program:
   start_save(csvfile = csvfile)
   trials = Trials()
